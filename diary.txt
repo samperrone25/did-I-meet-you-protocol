@@ -1,0 +1,4 @@
+6/04:
+
+Worked on basic bloom filter functionality for
+daily bloom filter (DBF)

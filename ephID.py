@@ -15,4 +15,6 @@ def gen_ephID():
 	return secexp, ephid
 
 if __name__ == "__main__":
-	print(generate_ephid())
+    result = gen_ephID()
+    print("\n element 0: " + str(result[0]) + "\n")
+    print("\n element 1: " + str(result[1]) + "\n")
