@@ -2,3 +2,17 @@
 
 Worked on basic bloom filter functionality for
 daily bloom filter (DBF)
+
+8/04:
+
+completed bloom filter functionality for DBF, CBF and QBF's.
+
+13/04:
+ 
+began working on integrating the seperate cryptographic components into Dimy.py and DimyServer.py files.
+
+16/04:
+
+udp client now encodes encounter id's into a daily bloom filter
+a second timer was added to the client to determine when new dbf's and qbf's should be made
+qbf successfully generated

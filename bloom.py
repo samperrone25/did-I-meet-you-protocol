@@ -30,10 +30,11 @@ def print_bloom(bloom):
 
     i = 0
     for bit in bloom:
-        print(str(bit) + ' ')
-        if (i % 10 == 9):
-            print('\n')
+        print(str(bit), end = "")
+        #if (i % 10 == 9):
+        #    print('\n')
         i += 1
+    print("\n")
 
 def merge_blooms(bloom1, bloom2):
 
