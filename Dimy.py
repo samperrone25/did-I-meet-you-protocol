@@ -1,3 +1,5 @@
+# usage: python3 Dimy.py backendIP backendPORT
+
 from ephID import *
 import bloom
 from socket import *
@@ -7,6 +9,7 @@ from hashlib import sha256
 from binascii import hexlify, unhexlify
 from Crypto.Protocol.SecretSharing import Shamir
 from queue import Queue
+import sys
 
 # global variable
 port = 38000
@@ -126,8 +129,20 @@ def udp_client():
 			
 			print("QBF: ", end = "")
 			bloom.print_bloom(QBF) # debug
+			
 			# send to backend via tcp
+			send_str = "Query" + "|" + bloom.to_string(QBF)
+			backend = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+			backend.connect((sys.argv[1], sys.argv[2]))
+			backend.sendall(send_str.encode('utf-8'))
+
 			# recieve and display result
+			recv_msg2 =  backend.recv(1024).decode("	utf-8")
+			if not recv_msg2:
+				print("No response from server")
+			print("Server's matching result: " + str(recv_msg2))
+			# close connection
+			# backend.close()
 			QBFtimer += 90 # update timer
 			##
 		##

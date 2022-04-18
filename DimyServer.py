@@ -25,40 +25,28 @@ def backend_server():
 
         try:
             print('connection with: ' + str(client_addr))
+            msg = client.recv(2048)
+            if msg:
+                # QUERY or UPLOAD
+                request, bloomstring = msg.decode("utf-8").split("|")
+                print("Recieved message: {} {}", request, bloomstring)
+                if request == "QUERY":
+                    pass
+                    # perform bloom matching against cbf_array
 
-            while True:
-                msg = client.recv(2048)
-                if msg:
-                    # QUERY or UPLOAD
-                    request, bloomstring = msg.decode("utf-8").split("|")
-                    print("Recieved message: {} {}", request, bloomstring)
-                    if request == "QUERY":
-                        pass
-                        # perform bloom matching against cbf_array
-                        # return result
-                    elif request == "UPLOAD":
-                        pass
-                        # add bloom to cbf_array
-                        # have to convert from '001001' to [0,0,1,0,0,1]
-                        realbloom = [0] * bloom.BLOOM_FILTER_SIZE
-                        i = 0
-                        for char in bloomstring:
-                            if char == '0':
-                                realbloom[i] = 0
-                            else:
-                                realbloom[i] = 1
-                        cbf_array.append(realbloom)
+                    # return result
+                    
+                elif request == "UPLOAD":
+                    pass
+                    # add bloom to cbf_array
+                    realbloom = bloom.to_array(bloomstring)
+                    cbf_array.append(realbloom)
 
-                    print('sending data back to the client')
-                    newstr = "ok"
-                    client.sendall(newstr)
-                else:
-                    print('connection closed with: ' + str(client_addr))
-                    break
+            else:
+                print('connection closed with: ' + str(client_addr))
 
         finally:
             client.close()
-
 
 if __name__ == "__main__":
 	backend_server()

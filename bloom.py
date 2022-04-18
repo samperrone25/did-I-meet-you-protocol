@@ -36,8 +36,25 @@ def print_bloom(bloom):
         i += 1
     print("\n")
 
-def to_string(bloom): #implement me
-    pass
+def to_string(bloom): # implement me
+    s = ''
+    for entry in bloom:
+        if entry == 0:
+            s += '0'
+        else:
+            s += '1'
+    return s
+
+# converts string '0101' bloom to array [0,1,01] bloom
+def to_array(bloomstring):
+    realbloom = [0] * BLOOM_FILTER_SIZE
+    i = 0
+    for char in bloomstring:
+        if char == '0':
+            realbloom[i] = 0
+        else:
+            realbloom[i] = 1
+    return realbloom
 
 def merge_blooms(bloom1, bloom2):
 
@@ -82,7 +99,8 @@ def merge_test():
 
     newbloom = merge_blooms(bloom1, bloom2)
     print_bloom(newbloom)
-    print()
+    print('or:')
+    print(to_string(newbloom))
 
 if __name__ == "__main__":
     # put desired tests here
