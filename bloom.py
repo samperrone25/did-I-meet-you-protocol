@@ -36,6 +36,9 @@ def print_bloom(bloom):
         i += 1
     print("\n")
 
+def to_string(bloom): #implement me
+    pass
+
 def merge_blooms(bloom1, bloom2):
 
     newbloom = [0] * BLOOM_FILTER_SIZE

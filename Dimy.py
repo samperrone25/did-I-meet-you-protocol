@@ -94,6 +94,7 @@ def udp_client():
 	
 	DBFQueue = Queue(maxsize = 6)
 	DBF = [0] * bloom.BLOOM_FILTER_SIZE
+	# use bloom.tostring(dbf) to make sendable object
 	DBFtimer = 30 # was 90
 	QBFtimer = 90 # was 9 minutes -> 540s
 	start_time2 = time.time()

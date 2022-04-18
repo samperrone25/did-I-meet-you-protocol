@@ -1,4 +1,5 @@
 import socket
+import bloom
 
 # inspiration: https://pymotw.com/3/socket/tcp.html
 
@@ -26,9 +27,28 @@ def backend_server():
             print('connection with: ' + str(client_addr))
 
             while True:
-                data = client.recv(2048)
-                print('received: ' + str(data))
-                if data:
+                msg = client.recv(2048)
+                if msg:
+                    # QUERY or UPLOAD
+                    request, bloomstring = msg.decode("utf-8").split("|")
+                    print("Recieved message: {} {}", request, bloomstring)
+                    if request == "QUERY":
+                        pass
+                        # perform bloom matching against cbf_array
+                        # return result
+                    elif request == "UPLOAD":
+                        pass
+                        # add bloom to cbf_array
+                        # have to convert from '001001' to [0,0,1,0,0,1]
+                        realbloom = [0] * bloom.BLOOM_FILTER_SIZE
+                        i = 0
+                        for char in bloomstring:
+                            if char == '0':
+                                realbloom[i] = 0
+                            else:
+                                realbloom[i] = 1
+                        cbf_array.append(realbloom)
+
                     print('sending data back to the client')
                     newstr = "ok"
                     client.sendall(newstr)
@@ -37,7 +57,6 @@ def backend_server():
                     break
 
         finally:
-            # Clean up the client
             client.close()
 
 

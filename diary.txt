@@ -16,3 +16,7 @@ began working on integrating the seperate cryptographic components into Dimy.py 
 udp client now encodes encounter id's into a daily bloom filter
 a second timer was added to the client to determine when new dbf's and qbf's should be made
 qbf successfully generated
+
+18/04:
+
+began writing the tcp backend server DimyServer.py which can accept a bloom filter for either query or storage purposes
