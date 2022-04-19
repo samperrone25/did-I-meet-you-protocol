@@ -8,15 +8,18 @@ import time
 from hashlib import sha256
 from binascii import hexlify, unhexlify
 from Crypto.Protocol.SecretSharing import Shamir
+import pyDH
 
 # global variable
 port = 38000
-priv_key = 0
+key = 0
 ephID_hash = ""
+dh = pyDH.DiffieHellman()
 
 print("----------Server Starting----------")
 
 # helpers
+# used secexp as the dh public key
 def generate_ephid():
 	curve = SECP128r1
 	secexp = randrange(curve.order)
@@ -38,14 +41,15 @@ def print_id(id, chunks):
 # https://gist.github.com/ninedraft/7c47282f8b53ac015c1e326fffb664b5
 def udp_server():
 
-	global port, ephID_hash, priv_key
+	global port, ephID_hash, key
+	public_key = dh.gen_public_key()
 
 	# create socket
 	broadcaster = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
 	broadcaster.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
 
 	# create new ephID and generate recv_shares
-	priv_key, ephID = generate_ephid()
+	key, ephID = generate_ephid()
 	# split id in to chunks (about to send)
 	# format: [id][content]
 	sender_ephID_chunk = Shamir.split(3, 5, ephID)
@@ -68,7 +72,7 @@ def udp_server():
 		# broadcast id every 15 seconds 15/60 = 4.5/18
 		if curr_timer > broadcast_timer and len(sender_ephID_chunk) != 0:
 			print(f"Broadcast chunks: {sender_ephID_chunk[0][0], hexlify(sender_ephID_chunk[0][1])}")
-			send_str = str(sender_ephID_chunk[0][0]) + "|" + hexlify(sender_ephID_chunk[0][1]).decode() + "|" + ephID_hash
+			send_str = str(sender_ephID_chunk[0][0]) + "|" + hexlify(sender_ephID_chunk[0][1]).decode() + "|" + ephID_hash + "|" + str(public_key)
 			broadcaster.sendto(send_str.encode('utf-8'), ('255.255.255.255', port))
 			# FIXME: use the counter method instead of pop from top
 			# and maybe don't include index
@@ -78,7 +82,7 @@ def udp_server():
 		# create new id every minute
 		elif curr_timer > id_timer:
 			# create new ephID and get the chunks
-			priv_key, ephID = generate_ephid()
+			key, ephID = generate_ephid()
 			sender_ephID_chunk = Shamir.split(3, 5, ephID)
 			
 			# hash of ephid
@@ -99,7 +103,7 @@ def udp_server():
 # https://gist.github.com/ninedraft/7c47282f8b53ac015c1e326fffb664b5
 def udp_client():
 
-	global port, ephID_hash, priv_key
+	global port, ephID_hash, key
 	
 	new_contact_list = {}
 
@@ -113,7 +117,11 @@ def udp_client():
 
 		# receive message
 		recv_msg, recv_addr = server_socket.recvfrom(2048)
-		recv_index, recv_share, recv_hash = recv_msg.decode("utf-8").split("|")
+		# parse the messaeg
+		recv_index = recv_msg.decode("utf-8").split("|")[0]
+		recv_share = recv_msg.decode("utf-8").split("|")[1]
+		recv_hash = recv_msg.decode("utf-8").split("|")[2]
+		key = recv_msg.decode("utf-8").split("|")[3]
 
 		# skip if receive own message
 		if recv_hash == ephID_hash:
@@ -121,6 +129,7 @@ def udp_client():
 		else:
 			# recv_index
 			# TODO: seems like we can get rid of index
+			# can keep it for demo purpose
 			recv_index = int(recv_index)
 
 			# recv_share
@@ -149,7 +158,7 @@ def udp_client():
 				print()
 				if recv_hash == new_hash:
 					print(f"Verified hash. Computing EncID...")
-					enc_id = int(hexlify(sec), 16) * priv_key
+					enc_id = dh.gen_shared_key(int(key))
 					print(f"EncID is: {enc_id}")
 				else:
 					print("Error: Hash not verified.")
