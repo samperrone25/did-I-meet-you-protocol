@@ -5,7 +5,7 @@ import bloom
 
 # variables
 cbf_array = []
-ip_port = ('192.168.88.100', 55000) # use port 55000, ip can change
+ip_port = ('192.168.88.132', 55000) # use port 55000, ip found with linux: 'ifconfig'
 
 def backend_server():
     # use TCP
@@ -30,17 +30,32 @@ def backend_server():
                 # QUERY or UPLOAD
                 request, bloomstring = msg.decode("utf-8").split("|")
                 print("Recieved message: {} {}", request, bloomstring)
+                send_str = "please make a query or upload"
                 if request == "QUERY":
-                    pass
                     # perform bloom matching against cbf_array
+                    match = False
+                    realbloom = bloom.to_array(bloomstring)
+                    for filter in cbf_array:
+                        intersection = bloom.bloom_intersection(realbloom, filter)
+                        print("intersection: {}", str(intersection))
+                        print("sum: {}", str(sum(intersection)))
+                        if sum(intersection) >= 3: # 3 hash functions -> 3 similar bits
+                            match = True
 
                     # return result
+                    if match:
+                        send_str = "Match"
+                    else: 
+                        send_str = "No Match"
                     
                 elif request == "UPLOAD":
-                    pass
                     # add bloom to cbf_array
                     realbloom = bloom.to_array(bloomstring)
                     cbf_array.append(realbloom)
+                    print("CBF added to cbf_array")
+                    send_str = "Upload Successful"
+                
+                client.sendall(send_str.encode('utf-8'))
 
             else:
                 print('connection closed with: ' + str(client_addr))

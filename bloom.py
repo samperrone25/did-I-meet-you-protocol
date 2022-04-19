@@ -54,6 +54,7 @@ def to_array(bloomstring):
             realbloom[i] = 0
         else:
             realbloom[i] = 1
+        i += 1
     return realbloom
 
 def merge_blooms(bloom1, bloom2):
@@ -61,6 +62,17 @@ def merge_blooms(bloom1, bloom2):
     newbloom = [0] * BLOOM_FILTER_SIZE
     for i in range(BLOOM_FILTER_SIZE):
         if (bloom1[i] or bloom2[i]): # OR the bits
+            newbloom[i] = 1
+        else:
+            newbloom[i] = 0
+    
+    return newbloom
+
+def bloom_intersection(bloom1, bloom2):
+
+    newbloom = [0] * BLOOM_FILTER_SIZE
+    for i in range(BLOOM_FILTER_SIZE):
+        if (bloom1[i] and bloom2[i]): # AND the bits
             newbloom[i] = 1
         else:
             newbloom[i] = 0

@@ -1,4 +1,4 @@
-# usage: python3 Dimy.py backendIP backendPORT
+# usage: python3 Dimy.py backendIP backendPORT time_until_covid
 
 from ephID import *
 import bloom
@@ -98,10 +98,12 @@ def udp_client():
 	DBFQueue = Queue(maxsize = 6)
 	DBF = [0] * bloom.BLOOM_FILTER_SIZE
 	# use bloom.tostring(dbf) to make sendable object
+	infected = False
 	DBFtimer = 30 # was 90
 	QBFtimer = 90 # was 9 minutes -> 540s
 	start_time2 = time.time()
 	current_time2 = time.time() - start_time2
+	covid_time = int(sys.argv[3])
 
 	while True:
 
@@ -119,33 +121,75 @@ def udp_client():
 			DBF = [0] * bloom.BLOOM_FILTER_SIZE # make new DBF
 			DBFtimer += 30 # update DBFtimer
 
-		if current_time2 > QBFtimer: ## check qbf timer
+		if current_time2 > QBFtimer and not infected: ## check qbf timer (if we have covid dont make qbf)
 			for i in range(5):
 				print("MAKING QBF\n")
 			QBF = [0] * bloom.BLOOM_FILTER_SIZE # make QBF
 			while not DBFQueue.empty():
-				temp_filter = DBFQueue.get()
+				temp_filter = DBFQueue.get() # remove and return item from queue
 				QBF = bloom.merge_blooms(QBF, temp_filter)
 			
 			print("QBF: ", end = "")
 			bloom.print_bloom(QBF) # debug
 			
 			# send to backend via tcp
-			send_str = "Query" + "|" + bloom.to_string(QBF)
-			backend = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-			backend.connect((sys.argv[1], sys.argv[2]))
+			send_str = "QUERY" + "|" + bloom.to_string(QBF)
+			backend = socket(AF_INET, SOCK_STREAM)
+			backend.connect((sys.argv[1], int(sys.argv[2])))
 			backend.sendall(send_str.encode('utf-8'))
 
 			# recieve and display result
-			recv_msg2 =  backend.recv(1024).decode("	utf-8")
+			recv_msg2 =  backend.recv(2048).decode("utf-8")
 			if not recv_msg2:
 				print("No response from server")
-			print("Server's matching result: " + str(recv_msg2))
-			# close connection
-			# backend.close()
+			print("Servers response: " + str(recv_msg2))
+
+			backend.close()
+
+			if recv_msg2 == "Match": # upload cbf to server and stop making QBF's
+			    # the qbf and the cbf are both just the combination of all dbf's, therefore we can upload the qbf as the cbf
+				send_str2 = "UPLOAD" + "|" + bloom.to_string(QBF)
+				backend = socket(AF_INET, SOCK_STREAM)
+				backend.connect((sys.argv[1], int(sys.argv[2])))
+				backend.sendall(send_str2.encode('utf-8'))
+				infected = True
+
+				# recieve and display result
+				recv_msg2 =  backend.recv(2048).decode("utf-8")
+				if not recv_msg2:
+					print("No response from server")
+				else:
+					print("Servers response: " + str(recv_msg2))
+				backend.close()
+
 			QBFtimer += 90 # update timer
 			##
 		##
+
+		if current_time2 > covid_time and not infected:
+			infected = True
+			# send cbf
+			for i in range(5):
+				print("MAKING CBF\n")
+			CBF = [0] * bloom.BLOOM_FILTER_SIZE # make QBF
+			while not DBFQueue.empty():
+				temp_filter = DBFQueue.get() # remove and return item from queue
+				CBF = bloom.merge_blooms(CBF, temp_filter)
+			
+			print("CBF: ", end = "")
+			bloom.print_bloom(CBF) # debug
+			
+			# send to backend via tcp
+			send_str = "UPLOAD" + "|" + bloom.to_string(CBF)
+			backend = socket(AF_INET, SOCK_STREAM)
+			backend.connect((sys.argv[1], int(sys.argv[2])))
+			backend.sendall(send_str.encode('utf-8'))
+
+			# recieve and display result
+			recv_msg2 =  backend.recv(2048).decode("utf-8")
+			if not recv_msg2:
+				print("No response from server")
+			print("Servers response: " + str(recv_msg2))
 
 		# skip if receive own message
 		if recv_hash == ephID_hash:
