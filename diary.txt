@@ -20,3 +20,9 @@ qbf successfully generated
 18/04:
 
 began writing the tcp backend server DimyServer.py which can accept a bloom filter for either query or storage purposes
+
+19/04:
+
+tcp server can now accept queries and uploads
+time_until_covid can be given to a node, after which it will act as though it has recieved a diagnosis
+the system is passing a three minute test with dbf at 90s, and one node having covid at 120s
