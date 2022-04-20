@@ -1,0 +1,28 @@
+6/04:
+
+Worked on basic bloom filter functionality for
+daily bloom filter (DBF)
+
+8/04:
+
+completed bloom filter functionality for DBF, CBF and QBF's.
+
+13/04:
+ 
+began working on integrating the seperate cryptographic components into Dimy.py and DimyServer.py files.
+
+16/04:
+
+udp client now encodes encounter id's into a daily bloom filter
+a second timer was added to the client to determine when new dbf's and qbf's should be made
+qbf successfully generated
+
+18/04:
+
+began writing the tcp backend server DimyServer.py which can accept a bloom filter for either query or storage purposes
+
+19/04:
+
+tcp server can now accept queries and uploads
+time_until_covid can be given to a node, after which it will act as though it has recieved a diagnosis
+the system is passing a three minute test with dbf at 90s, and one node having covid at 120s

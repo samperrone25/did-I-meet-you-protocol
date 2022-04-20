@@ -1,6 +1,7 @@
 # Code for task 1
 from ecdsa import SigningKey, SECP128r1
 from ecdsa.util import randrange
+from binascii import hexlify
 # This is an easy-to-use implementation of ECC 
 
 # Code sample from document
@@ -14,5 +15,15 @@ def gen_ephID():
 
 	return secexp, ephid
 
+# print both id and recive shares
+def print_id(id, chunks):
+	print()
+	print(f"Generating ID: {hexlify(id)}")
+	for i, chunk in chunks:
+		print(f"Chunk {i}: ({i}, {hexlify(chunk)})")
+	print()
+
 if __name__ == "__main__":
-	print(generate_ephid())
+    result = gen_ephID()
+    print("\n element 0: " + str(result[0]) + "\n")
+    print("\n element 1: " + str(result[1]) + "\n")
