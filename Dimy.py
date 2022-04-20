@@ -8,64 +8,33 @@ import time
 from hashlib import sha256
 from binascii import hexlify, unhexlify
 from Crypto.Protocol.SecretSharing import Shamir
-import pyDH
-import random
 from queue import Queue
 import sys
 from constants import *
 
-# global variable
-port = 38000
-key = 0
+# global variables
+priv_key = 0 	
 ephID_hash = ""
-dh = pyDH.DiffieHellman()
-
-print("----------Server Starting----------")
-
-# helpers
-# used secexp as the dh public key
-def generate_ephid():
-	curve = SECP128r1
-	secexp = randrange(curve.order)
-	sk = SigningKey.from_secret_exponent(secexp, curve)
-	ephid = sk.to_string()
-
-	return secexp, ephid
-# print both id and recive shares
-def print_id(id, chunks):
-	print()
-	print(f"Generating ID: {hexlify(id)}")
-	for i, chunk in chunks:
-		print(f"Chunk {i}: ({i}, {hexlify(chunk)})")
-	print()
-
-def message_drop():
-	num = random.uniform(0, 1)
-	return num<0.5
-
-
 
 print("----------DIMY Node Starting----------")
-# udp client/server in this case
-# Broadcaster and reciever is taken from 
-# the code snippet here:
+
+# UDP broadcaster
 # https://gist.github.com/ninedraft/7c47282f8b53ac015c1e326fffb664b5
 def udp_server():
 
-	global port, ephID_hash, key
-	public_key = dh.gen_public_key()
-
+	global ephID_hash, priv_key
 
 	# create socket
 	broadcaster = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
 	broadcaster.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
 
 	# create new ephID and generate recv_shares
-	key, ephID = generate_ephid()
+	priv_key, ephID = gen_ephID()
 	# split id in to chunks (about to send)
 	# format: [id][content]
 	sender_ephID_chunk = Shamir.split(3, 5, ephID)
 	print_id(ephID, sender_ephID_chunk)
+
 	# hash of ephid
 	ephID_hash = sha256(ephID).hexdigest()
 
@@ -76,24 +45,18 @@ def udp_server():
 
 	while True:
 
-		# broadcast id every 15 seconds 15/60 = 4.5/18
+		# broadcast
 		if curr_timer > broadcast_timer and len(sender_ephID_chunk) != 0:
-			print(f"Broadcast chunks: {sender_ephID_chunk[0][0], hexlify(sender_ephID_chunk[0][1])}")
-			send_str = str(sender_ephID_chunk[0][0]) + "|" + hexlify(sender_ephID_chunk[0][1]).decode() + "|" + ephID_hash + "|" + str(public_key)
-			# Message drop mech
-			if message_drop():
-				broadcaster.sendto(send_str.encode('utf-8'), ('255.255.255.255', NODE_PORT))
-			else:
-				print("Chunk not sent due to message drop mechanism")
-			# FIXME: use the counter method instead of pop from top
-			# and maybe don't include index
+			print(f"Broadcast chunks: {sender_ephID_chunk[0][0], hexlify(sender_ephID_chunk[0][1])}\n")
+			send_str = str(sender_ephID_chunk[0][0]) + "|" + hexlify(sender_ephID_chunk[0][1]).decode() + "|" + ephID_hash
+			broadcaster.sendto(send_str.encode('utf-8'), ('255.255.255.255', NODE_PORT))
 			sender_ephID_chunk.pop(0)
 			broadcast_timer += BROADCAST_INTERVAL # broadcast shares at 1 unique share per BROADCAST_INTERVAL seconds
 
-		# create new id every minute
+		# create new id
 		elif curr_timer > id_timer:
 			# create new ephID and get the chunks
-			key, ephID = generate_ephid()
+			priv_key, ephID = gen_ephID()
 			sender_ephID_chunk = Shamir.split(3, 5, ephID)
 			
 			# hash of ephid
@@ -108,13 +71,11 @@ def udp_server():
 		# update timer
 		curr_timer = time.time() - start_time
 
-# udp client/server in this case
-# Broadcaster and reciever is taken from 
-# the code snippet here:
-# https://gist.github.com/ninedraft/7c47282f8b53ac015c1e326fffb664b5
+# UDP reciever
+# inspiration: https://gist.github.com/ninedraft/7c47282f8b53ac015c1e326fffb664b5
 def udp_client():
 
-	global port, ephID_hash, key
+	global ephID_hash, priv_key
 	
 	new_contact_list = {}
 
@@ -137,11 +98,7 @@ def udp_client():
 
 		# receive message
 		recv_msg, recv_addr = server_socket.recvfrom(2048)
-		# parse the messaeg
-		recv_index = recv_msg.decode("utf-8").split("|")[0]
-		recv_share = recv_msg.decode("utf-8").split("|")[1]
-		recv_hash = recv_msg.decode("utf-8").split("|")[2]
-		key = recv_msg.decode("utf-8").split("|")[3]
+		recv_index, recv_share, recv_hash = recv_msg.decode("utf-8").split("|")
 
         # check dbf timer
 		if current_time2 > DBFtimer:
@@ -166,7 +123,7 @@ def udp_client():
 			# send to backend via tcp
 			send_str = "QUERY" + "|" + bloom.to_string(QBF)
 			backend = socket(AF_INET, SOCK_STREAM)
-			backend.connect((sys.argv[1], int(sys.argv[2])))
+			backend.connect((BACKEND_IP, BACKEND_PORT))
 			backend.sendall(send_str.encode('utf-8'))
 
 			# recieve and display result
@@ -181,7 +138,7 @@ def udp_client():
 			    # the qbf and the cbf are both just the combination of all dbf's, therefore we can upload the qbf as the cbf
 				send_str2 = "UPLOAD" + "|" + bloom.to_string(QBF)
 				backend = socket(AF_INET, SOCK_STREAM)
-				backend.connect((sys.argv[1], int(sys.argv[2])))
+				backend.connect((BACKEND_IP, BACKEND_PORT))
 				backend.sendall(send_str2.encode('utf-8'))
 				print("CBF uploaded: ", end = "")
 				bloom.print_bloom(QBF)
@@ -209,7 +166,7 @@ def udp_client():
 			# send to backend via tcp
 			send_str = "UPLOAD" + "|" + bloom.to_string(CBF)
 			backend = socket(AF_INET, SOCK_STREAM)
-			backend.connect((sys.argv[1], int(sys.argv[2])))
+			backend.connect((BACKEND_IP, BACKEND_PORT))
 			backend.sendall(send_str.encode('utf-8'))
 			print("CBF uploaded: ", end = "")
 			bloom.print_bloom(CBF)
@@ -225,7 +182,7 @@ def udp_client():
 		if recv_hash == ephID_hash:
 			continue
 		else:
-			print("Recieved id share {}", recv_share)
+			print("Recieved id share "  + recv_share)
 			recv_index = int(recv_index)
 
 			# recv_share
