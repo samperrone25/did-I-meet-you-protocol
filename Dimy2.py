@@ -56,15 +56,13 @@ def udp_server():
 
 		# broadcast id every 15 seconds 15/60 = 4.5/18
 		if curr_timer > broadcast_timer and len(sender_ephID_chunk) != 0:
-			print(f"Broadcast chunks: {sender_ephID_chunk[0][0], hexlify(sender_ephID_chunk[0][1])}")
 			send_str = str(sender_ephID_chunk[0][0]) + "|" + hexlify(sender_ephID_chunk[0][1]).decode() + "|" + ephID_hash + "|" + str(public_key)
 			# Message drop mech
 			if message_drop():
+				print(f"Broadcast chunks: {sender_ephID_chunk[0][0], hexlify(sender_ephID_chunk[0][1])}")
 				broadcaster.sendto(send_str.encode('utf-8'), ('255.255.255.255', NODE_PORT))
 			else:
-				print("Chunk not sent due to message drop mechanism")
-			# FIXME: use the counter method instead of pop from top
-			# and maybe don't include index
+				print("Broadcast dropped")
 			sender_ephID_chunk.pop(0)
 			broadcast_timer += BROADCAST_INTERVAL # broadcast shares at 1 unique share per BROADCAST_INTERVAL seconds
 
@@ -120,7 +118,7 @@ def udp_client():
 			if recv_hash == ephID_hash:
 				print(f"Computing EncID...")
 				enc_id = dh.gen_shared_key(int(key))
-				print(f"EncID is: {enc_id}")
+				print(f"EncID is: {enc_id} \n")
 				# update dbf
 				if not bloom.check_item(DBF, str(enc_id)): # add enc id
 					bloom.add_item(DBF, str(enc_id))
@@ -238,12 +236,11 @@ def udp_client():
 					new_hash = sha256(sec).hexdigest()
 					print(f"Received hash: 	   {recv_hash}")
 					print(f"Recontructed hash: {new_hash}")
-					print()
 					
 					if recv_hash == new_hash:
 						print(f"Verified hash. Computing EncID...")
 						enc_id = dh.gen_shared_key(int(key))
-						print(f"EncID is: {enc_id}")
+						print(f"EncID is: {enc_id} \n")
 						broadcaster = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
 						broadcaster.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
 						send_str = '***' + "|" + recv_hash + "|" + str(public_key)
@@ -256,7 +253,6 @@ def udp_client():
 
 					else:
 						print("Error: Hash not verified.")
-					print()
 
 			# update timer
 			current_time2 = time.time() - start_time2
