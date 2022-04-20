@@ -1,18 +1,19 @@
 import socket
 import bloom
+from constants import *
 
 # inspiration: https://pymotw.com/3/socket/tcp.html
 
 # variables
 cbf_array = []
-ip_port = ('192.168.88.132', 55000) # use port 55000, ip found with linux: 'ifconfig'
+ip_port = (BACKEND_IP, BACKEND_PORT) # use port 55000, ip found with linux: 'ifconfig'
 
 def backend_server():
     # use TCP
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     # bind socket
-    print('starting up on {} port {}'.format(*ip_port))
+    print('Starting on {}:{}'.format(*ip_port))
     server.bind(ip_port)
 
     # listen
@@ -20,25 +21,23 @@ def backend_server():
     while True:
 
         # await clients
-        print('waiting')
+        print('Idle...')
         client, client_addr = server.accept()
 
         try:
-            print('connection with: ' + str(client_addr))
+            print('Connected to: ' + str(client_addr))
             msg = client.recv(2048)
             if msg:
                 # QUERY or UPLOAD
                 request, bloomstring = msg.decode("utf-8").split("|")
-                print("Recieved message: {} {}", request, bloomstring)
-                send_str = "please make a query or upload"
+                print("Recieved message: {} {}".format(request, bloomstring))
+                send_str = "Please make a query or upload"
                 if request == "QUERY":
                     # perform bloom matching against cbf_array
                     match = False
                     realbloom = bloom.to_array(bloomstring)
                     for filter in cbf_array:
                         intersection = bloom.bloom_intersection(realbloom, filter)
-                        print("intersection: {}", str(intersection))
-                        print("sum: {}", str(sum(intersection)))
                         if sum(intersection) >= 3: # 3 hash functions -> 3 similar bits
                             match = True
 
@@ -56,9 +55,10 @@ def backend_server():
                     send_str = "Upload Successful"
                 
                 client.sendall(send_str.encode('utf-8'))
+                print("Replied: " + send_str)
 
             else:
-                print('connection closed with: ' + str(client_addr))
+                print('Connection closed with: ' + str(client_addr))
 
         finally:
             client.close()
