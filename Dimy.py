@@ -9,6 +9,7 @@ from hashlib import sha256
 from binascii import hexlify, unhexlify
 from Crypto.Protocol.SecretSharing import Shamir
 import pyDH
+import random
 
 # global variable
 port = 38000
@@ -34,6 +35,10 @@ def print_id(id, chunks):
 	for i, chunk in chunks:
 		print(f"Chunk {i}: ({i}, {hexlify(chunk)})")
 	print()
+
+def message_drop():
+	num = random.uniform(0, 1)
+	return num<0.5
 
 # udp client/server in this case
 # Broadcaster and reciever is taken from 
@@ -73,7 +78,11 @@ def udp_server():
 		if curr_timer > broadcast_timer and len(sender_ephID_chunk) != 0:
 			print(f"Broadcast chunks: {sender_ephID_chunk[0][0], hexlify(sender_ephID_chunk[0][1])}")
 			send_str = str(sender_ephID_chunk[0][0]) + "|" + hexlify(sender_ephID_chunk[0][1]).decode() + "|" + ephID_hash + "|" + str(public_key)
-			broadcaster.sendto(send_str.encode('utf-8'), ('255.255.255.255', port))
+			# Message drop mech
+			if message_drop():
+				broadcaster.sendto(send_str.encode('utf-8'), ('255.255.255.255', port))
+			else:
+				print("Chunk not sent due to message drop mechanism")
 			# FIXME: use the counter method instead of pop from top
 			# and maybe don't include index
 			sender_ephID_chunk.pop(0)
