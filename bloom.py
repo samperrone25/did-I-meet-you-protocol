@@ -4,7 +4,7 @@
 # bloom_filter = [0] * size
 import pyhash
 
-BLOOM_FILTER_SIZE = 20 # change to 819200 for real implementation, 100 KILOBYTES = 819200 BITS
+BLOOM_FILTER_SIZE = 100 # change to 819200 for real implementation, 100 KILOBYTES = 819200 BITS
 HFUNCS = [pyhash.murmur3_32(), pyhash.lookup3(), pyhash.xx_64()]
 
 def add_item(bloom, item):
