@@ -21,7 +21,7 @@ def backend_server():
     while True:
 
         # await clients
-        print('Idle...')
+        print('Idle...\n')
         client, client_addr = server.accept()
 
         try:
@@ -37,10 +37,12 @@ def backend_server():
                 send_str = "Please make a query or upload"
                 if request == "QUERY":
                     # perform bloom matching against cbf_array
+                    print("Comparing query bloom filter against stored contact bloom filters...")
                     match = False
                     for filter in cbf_array:
                         intersection = bloom.bloom_intersection(realbloom, filter)
-                        if sum(intersection) >= 3: # 3 hash functions -> 3 similar bits
+                        
+                    if sum(intersection) >= 3: # 3 hash functions -> 3 similar bits
                             match = True
 
                     # return result
@@ -57,7 +59,7 @@ def backend_server():
                     send_str = "Upload Successful"
                 
                 client.sendall(send_str.encode('utf-8'))
-                print("Replied: " + send_str)
+                print("Result: " + send_str + "\n")
 
             else:
                 print('Connection closed with: ' + str(client_addr))
