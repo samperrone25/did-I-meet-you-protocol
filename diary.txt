@@ -26,3 +26,10 @@ began writing the tcp backend server DimyServer.py which can accept a bloom filt
 tcp server can now accept queries and uploads
 time_until_covid can be given to a node, after which it will act as though it has recieved a diagnosis
 the system is passing a three minute test with dbf at 90s, and one node having covid at 120s
+
+20/04
+
+created a constants file for easier varying of parameters such as dbf expiry time, qbf creation time, id generation time and broadcast interval
+improved the print messages for both the nodes and the tcp server
+
+all is in place except for possible timestamping of id shares
