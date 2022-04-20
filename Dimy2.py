@@ -21,30 +21,9 @@ ephID_hash = ""
 dh = pyDH.DiffieHellman()
 public_key = dh.gen_public_key()
 
-print("----------Server Starting----------")
-
-# helpers
-# used secexp as the dh public key
-def generate_ephid():
-	curve = SECP128r1
-	secexp = randrange(curve.order)
-	sk = SigningKey.from_secret_exponent(secexp, curve)
-	ephid = sk.to_string()
-
-	return secexp, ephid
-# print both id and recive shares
-def print_id(id, chunks):
-	print()
-	print(f"Generating ID: {hexlify(id)}")
-	for i, chunk in chunks:
-		print(f"Chunk {i}: ({i}, {hexlify(chunk)})")
-	print()
-
 def message_drop():
 	num = random.uniform(0, 1)
 	return num<0.5
-
-
 
 print("----------DIMY Node Starting----------")
 # udp client/server in this case
@@ -60,7 +39,7 @@ def udp_server():
 	broadcaster.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
 
 	# create new ephID and generate recv_shares
-	key, ephID = generate_ephid()
+	key, ephID = gen_ephID()
 	# split id in to chunks (about to send)
 	# format: [id][content]
 	sender_ephID_chunk = Shamir.split(3, 5, ephID)
@@ -92,7 +71,7 @@ def udp_server():
 		# create new id every minute
 		elif curr_timer > id_timer:
 			# create new ephID and get the chunks
-			key, ephID = generate_ephid()
+			key, ephID = gen_ephID()
 			sender_ephID_chunk = Shamir.split(3, 5, ephID)
 			
 			# hash of ephid
