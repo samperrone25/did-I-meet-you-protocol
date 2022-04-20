@@ -30,12 +30,14 @@ def backend_server():
             if msg:
                 # QUERY or UPLOAD
                 request, bloomstring = msg.decode("utf-8").split("|")
-                print("Recieved message: {} {}".format(request, bloomstring))
+                realbloom = bloom.to_array(bloomstring)
+                print("Recieved message: {} ".format(request), end = " ")
+                print("with bloom filter: ", end = "")
+                bloom.print_bloom(realbloom)
                 send_str = "Please make a query or upload"
                 if request == "QUERY":
                     # perform bloom matching against cbf_array
                     match = False
-                    realbloom = bloom.to_array(bloomstring)
                     for filter in cbf_array:
                         intersection = bloom.bloom_intersection(realbloom, filter)
                         if sum(intersection) >= 3: # 3 hash functions -> 3 similar bits
