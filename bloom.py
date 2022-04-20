@@ -1,10 +1,10 @@
 # all bloom filters are 100kb and use 3 hash functions
-# 100 KB = 800000 bits
+# 100 KB = 819200 bits
 
 # bloom_filter = [0] * size
 import pyhash
 
-BLOOM_FILTER_SIZE = 20 # change to 80000 for real implementation
+BLOOM_FILTER_SIZE = 20 # change to 819200 for real implementation, 100 KILOBYTES = 819200 BITS
 HFUNCS = [pyhash.murmur3_32(), pyhash.lookup3(), pyhash.xx_64()]
 
 def add_item(bloom, item):
@@ -29,12 +29,20 @@ def check_item(bloom, item):
 def print_bloom(bloom):
 
     i = 0
+    print("Indexes ", end = "")
+    empty = True
     for bit in bloom:
-        print(str(bit), end = "")
+        if bit == 1:
+            print(str(i) + ", ", end = "")
+            empty = False
         #if (i % 10 == 9):
         #    print('\n')
         i += 1
-    print("\n")
+    if empty:
+        print("Empty")
+    print(" \n")
+
+    # Indexes 1, 3, 70, 8780, 
 
 def to_string(bloom): # implement me
     s = ''
@@ -45,7 +53,7 @@ def to_string(bloom): # implement me
             s += '1'
     return s
 
-# converts string '0101' bloom to array [0,1,01] bloom
+# converts string '0101' bloom to array [0,1,0,1] bloom
 def to_array(bloomstring):
     realbloom = [0] * BLOOM_FILTER_SIZE
     i = 0
