@@ -35,16 +35,14 @@ def print_bloom(bloom):
         if bit == 1:
             print(str(i) + ", ", end = "")
             empty = False
-        #if (i % 10 == 9):
-        #    print('\n')
         i += 1
     if empty:
         print("Empty")
     print(" \n")
 
-    # Indexes 1, 3, 70, 8780, 
+    # sample output: Indexes 1, 3, 70, 8780, 
 
-def to_string(bloom): # implement me
+def to_string(bloom):
     s = ''
     for entry in bloom:
         if entry == 0:
