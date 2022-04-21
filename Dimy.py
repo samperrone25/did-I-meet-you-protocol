@@ -1,4 +1,4 @@
-# usage: python3 Dimy.py backendIP backendPORT time_until_covid
+# usage: python3 Dimy.py time_until_covid
 
 from ephID import *
 import bloom
@@ -8,33 +8,39 @@ import time
 from hashlib import sha256
 from binascii import hexlify, unhexlify
 from Crypto.Protocol.SecretSharing import Shamir
+import pyDH
+import random
 from queue import Queue
 import sys
 from constants import *
 
 # global variables
-priv_key = 0 	
+port = 38000
+key = 0
 ephID_hash = ""
+dh = pyDH.DiffieHellman()
+public_key = dh.gen_public_key()
+
+def message_drop():
+	num = random.uniform(0, 1)
+	return num<0.5
 
 print("----------DIMY Node Starting----------")
-
-# UDP broadcaster
-# https://gist.github.com/ninedraft/7c47282f8b53ac015c1e326fffb664b5
+# UDP Broadcaster Function
 def udp_server():
 
-	global ephID_hash, priv_key
+	global port, ephID_hash, key
 
 	# create socket
 	broadcaster = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
 	broadcaster.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
 
 	# create new ephID and generate recv_shares
-	priv_key, ephID = gen_ephID()
+	key, ephID = gen_ephID()
 	# split id in to chunks (about to send)
 	# format: [id][content]
 	sender_ephID_chunk = Shamir.split(3, 5, ephID)
 	print_id(ephID, sender_ephID_chunk)
-
 	# hash of ephid
 	ephID_hash = sha256(ephID).hexdigest()
 
@@ -45,18 +51,22 @@ def udp_server():
 
 	while True:
 
-		# broadcast
+		# broadcast id every BROADCAST_INTERVAL seconds
 		if curr_timer > broadcast_timer and len(sender_ephID_chunk) != 0:
-			print(f"Broadcast chunks: {sender_ephID_chunk[0][0], hexlify(sender_ephID_chunk[0][1])}\n")
-			send_str = str(sender_ephID_chunk[0][0]) + "|" + hexlify(sender_ephID_chunk[0][1]).decode() + "|" + ephID_hash
-			broadcaster.sendto(send_str.encode('utf-8'), ('255.255.255.255', NODE_PORT))
+			send_str = str(sender_ephID_chunk[0][0]) + "|" + hexlify(sender_ephID_chunk[0][1]).decode() + "|" + ephID_hash + "|" + str(public_key)
+			# Message drop mechanism
+			if message_drop():
+				print(f"[Task 3A] Broadcast chunks: {sender_ephID_chunk[0][0], hexlify(sender_ephID_chunk[0][1])}")
+				broadcaster.sendto(send_str.encode('utf-8'), ('255.255.255.255', NODE_PORT))
+			else:
+				print("[Task 3A] Broadcast dropped")
 			sender_ephID_chunk.pop(0)
-			broadcast_timer += BROADCAST_INTERVAL # broadcast shares at 1 unique share per BROADCAST_INTERVAL seconds
+			broadcast_timer += BROADCAST_INTERVAL
 
-		# create new id
+		# create new ephID every ID_TIMER seconds
 		elif curr_timer > id_timer:
 			# create new ephID and get the chunks
-			priv_key, ephID = gen_ephID()
+			key, ephID = gen_ephID()
 			sender_ephID_chunk = Shamir.split(3, 5, ephID)
 			
 			# hash of ephid
@@ -64,20 +74,18 @@ def udp_server():
 
 			# print id and sender's chunk
 			print_id(ephID, sender_ephID_chunk)
-
-			# set timer
-			id_timer += ID_TIMER # generate new ephID every ID_TIMER seconds
+			id_timer += ID_TIMER
 
 		# update timer
 		curr_timer = time.time() - start_time
 
-# UDP reciever
-# inspiration: https://gist.github.com/ninedraft/7c47282f8b53ac015c1e326fffb664b5
+# UDP Reciever Function
 def udp_client():
 
-	global ephID_hash, priv_key
+	global port, ephID_hash, key
 	
-	new_contact_list = {}
+	new_contact_list = {} # stores id shares
+	timestamp_dict = {} # timestamps id's for later removal
 
 	# create socket
 	server_socket = socket(AF_INET, SOCK_DGRAM) # UDP
@@ -86,141 +94,175 @@ def udp_client():
 	server_socket.bind(("", NODE_PORT))
 	
 	DBFQueue = Queue(maxsize = 6) # queue of daily bloom filters
-	DBF = [0] * bloom.BLOOM_FILTER_SIZE
-	infected = False
+	DBF = [0] * bloom.BLOOM_FILTER_SIZE # current DBF
+	infected = False # variable representing exposure to covid
 	DBFtimer = DBF_TIMER # new dbf every DBF_TIMER seconds
 	QBFtimer = QBF_TIMER # new qbf every QBF_TIMER seconds
 	start_time2 = time.time()
 	current_time2 = time.time() - start_time2
-	covid_time = int(sys.argv[3]) # time until diagnosis
+	covid_time = int(sys.argv[1]) # time until diagnosis
 
 	while True:
-
-		# receive message
+		
 		recv_msg, recv_addr = server_socket.recvfrom(2048)
-		recv_index, recv_share, recv_hash = recv_msg.decode("utf-8").split("|")
 
-        # check dbf timer
-		if current_time2 > DBFtimer:
-			print("DBF expired")
-			print("DBF: ", end = "")
-			bloom.print_bloom(DBF)
+		compare_list = new_contact_list # clean id share dictionary
+		new_contact_list = {k: v for k, v in new_contact_list.items() if current_time2 < timestamp_dict[k] + ID_TIMER * 1.3}
+		if (compare_list != new_contact_list):
+			print("[Task 3C] Removed old id shares")
+		
+		if "*" in recv_msg.decode("utf-8"): # special broadcast for when the other node encountered us but we didnt encounter them
+			recv_hash = recv_msg.decode("utf-8").split("|")[1]
+			key = recv_msg.decode("utf-8").split("|")[2]
+			if recv_hash == ephID_hash:
+				print(f"Computing EncID...")
+				enc_id = dh.gen_shared_key(int(key))
+				print(f"[Task 5A/5B] EncID is: {enc_id} \n")
+				# update dbf
+				if not bloom.check_item(DBF, str(enc_id)): # add enc id
+					bloom.add_item(DBF, str(enc_id))
+					print("[Task 6/7A] EncID deleted, DBF updated: ", end = "")
+					bloom.print_bloom(DBF)
+					enc_id = 0 # overwrite variable
+			else:
+				continue
+		else: # regular broadcast
+			recv_index = recv_msg.decode("utf-8").split("|")[0]
+			recv_share = recv_msg.decode("utf-8").split("|")[1]
+			recv_hash = recv_msg.decode("utf-8").split("|")[2]
+			key = recv_msg.decode("utf-8").split("|")[3]
 
-			DBFQueue.put(DBF) # enqueue old DBF
-			DBF = [0] * bloom.BLOOM_FILTER_SIZE # make new DBF
-			DBFtimer += DBF_TIMER # new dbf every DBF_TIMER seconds
+			# check dbf timer
+			if current_time2 > DBFtimer:
+				print("[Task 7B] DBF expired")
+				print("DBF: ", end = "")
+				bloom.print_bloom(DBF)
 
-        # check qbf timer, no need to make qbf's if infected
-		if current_time2 > QBFtimer and not infected:
-			QBF = [0] * bloom.BLOOM_FILTER_SIZE # make QBF
-			while not DBFQueue.empty():
-				temp_filter = DBFQueue.get() # remove and return item from queue
-				QBF = bloom.merge_blooms(QBF, temp_filter)
-			
-			print("QBF created: ", end = "")
-			bloom.print_bloom(QBF)
-			
-			# send to backend via tcp
-			send_str = "QUERY" + "|" + bloom.to_string(QBF)
-			backend = socket(AF_INET, SOCK_STREAM)
-			backend.connect((BACKEND_IP, BACKEND_PORT))
-			backend.sendall(send_str.encode('utf-8'))
+				DBFQueue.put(DBF) # enqueue old DBF
+				DBF = [0] * bloom.BLOOM_FILTER_SIZE # make new DBF
+				DBFtimer += DBF_TIMER # new dbf every DBF_TIMER seconds
 
-			# recieve and display result
-			recv_msg2 =  backend.recv(2048).decode("utf-8")
-			if not recv_msg2:
-				print("No response from server")
-			print("Servers response: " + str(recv_msg2) + "\n")
+			# check qbf timer, no need to make qbf's if infected
+			if current_time2 > QBFtimer and not infected:
+				QBF = [0] * bloom.BLOOM_FILTER_SIZE # make QBF
+				while not DBFQueue.empty(): # merge with every dbf in the queue and the current dbf!
+					temp_filter = DBFQueue.get() # remove and return item from queue
+					QBF = bloom.merge_blooms(QBF, temp_filter)
+				QBF = bloom.merge_blooms(QBF, DBF)
 
-			backend.close()
-
-			if recv_msg2 == "Match": # upload cbf to server and stop making QBF's
-			    # the qbf and the cbf are both just the combination of all dbf's, therefore we can upload the qbf as the cbf
-				send_str2 = "UPLOAD" + "|" + bloom.to_string(QBF)
+				print("[Task 8] QBF created: ", end = "")
+				bloom.print_bloom(QBF)
+				
+				# send to backend via tcp
+				send_str = "QUERY" + "|" + bloom.to_string(QBF)
 				backend = socket(AF_INET, SOCK_STREAM)
 				backend.connect((BACKEND_IP, BACKEND_PORT))
-				backend.sendall(send_str2.encode('utf-8'))
-				print("CBF uploaded: ", end = "")
-				bloom.print_bloom(QBF)
+				backend.sendall(send_str.encode('utf-8'))
+				print("[Task 10A] QBF sent to backend")
+
+				# recieve and display result
+				recv_msg2 =  backend.recv(2048).decode("utf-8")
+				if not recv_msg2:
+					print("[Task 10B] No response from server")
+				print("[Task 10B] Servers response: " + str(recv_msg2) + "\n")
+
+				backend.close()
+
+				if recv_msg2 == "Match": # upload cbf to server and stop making QBF's
+					print("I have covid...")
+					# the qbf and the cbf are both just the combination of all dbf's, therefore we can upload the qbf as the cbf
+					send_str2 = "UPLOAD" + "|" + bloom.to_string(QBF)
+					backend = socket(AF_INET, SOCK_STREAM)
+					backend.connect((BACKEND_IP, BACKEND_PORT))
+					backend.sendall(send_str2.encode('utf-8'))
+					print("[Task 9] CBF uploaded: ", end = "")
+					bloom.print_bloom(QBF)
+					infected = True
+
+					# recieve and display result
+					recv_msg2 =  backend.recv(2048).decode("utf-8")
+					if not recv_msg2:
+						print("No response from server")
+					else:
+						print("Servers response: " + str(recv_msg2) + "\n")
+					backend.close()
+
+				QBFtimer += QBF_TIMER # new qbf every QBF_TIMER seconds
+
+			# a node recieves a covid diagnosis
+			if current_time2 > covid_time and not infected:
 				infected = True
+				print("I have covid...")
+				# upload cbf	
+				CBF = [0] * bloom.BLOOM_FILTER_SIZE # make CBF
+				while not DBFQueue.empty(): # merge with every dbf in the queue and the current dbf!
+					temp_filter = DBFQueue.get() # remove and return item from queue
+					CBF = bloom.merge_blooms(CBF, temp_filter)
+				CBF = bloom.merge_blooms(CBF, DBF)
+				
+				# send to backend via tcp
+				send_str = "UPLOAD" + "|" + bloom.to_string(CBF)
+				backend = socket(AF_INET, SOCK_STREAM)
+				backend.connect((BACKEND_IP, BACKEND_PORT))
+				backend.sendall(send_str.encode('utf-8'))
+				print("[Task 9] CBF uploaded: ", end = "")
+				bloom.print_bloom(CBF)
 
 				# recieve and display result
 				recv_msg2 =  backend.recv(2048).decode("utf-8")
 				if not recv_msg2:
 					print("No response from server")
-				else:
-					print("Servers response: " + str(recv_msg2) + "\n")
+				print("Servers response: " + str(recv_msg2) + "\n")
 				backend.close()
 
-			QBFtimer += QBF_TIMER # new qbf every QBF_TIMER seconds
-
-        # a node recieves a covid diagnosis
-		if current_time2 > covid_time and not infected:
-			infected = True
-			# upload cbf
-			CBF = [0] * bloom.BLOOM_FILTER_SIZE # make QBF
-			while not DBFQueue.empty():
-				temp_filter = DBFQueue.get() # remove and return item from queue
-				CBF = bloom.merge_blooms(CBF, temp_filter)
-			
-			# send to backend via tcp
-			send_str = "UPLOAD" + "|" + bloom.to_string(CBF)
-			backend = socket(AF_INET, SOCK_STREAM)
-			backend.connect((BACKEND_IP, BACKEND_PORT))
-			backend.sendall(send_str.encode('utf-8'))
-			print("CBF uploaded: ", end = "")
-			bloom.print_bloom(CBF)
-
-			# recieve and display result
-			recv_msg2 =  backend.recv(2048).decode("utf-8")
-			if not recv_msg2:
-				print("No response from server")
-			print("Servers response: " + str(recv_msg2) + "\n")
-			backend.close()
-
-		# skip if receive own message
-		if recv_hash == ephID_hash:
-			continue
-		else:
-			print("Recieved id share "  + recv_share)
-			recv_index = int(recv_index)
-
-			# recv_share
-			recv_share = unhexlify(recv_share.encode())
-			
-			if recv_hash not in new_contact_list.keys():
-				new_contact_list[recv_hash] = [(recv_index, recv_share)]
+			# skip if receive own message
+			if recv_hash == ephID_hash:
+				continue
 			else:
-				new_contact_list[recv_hash].append((recv_index, recv_share))
-			
-			# keep track of number of recv_shares received
-			num_recv_shares = len(new_contact_list[recv_hash])
-			print(f"Received {num_recv_shares} chunks from {recv_hash}.\n")
-			
-			# Check if the hash contains 3 entries
-			if num_recv_shares == 3:
-				sec = Shamir.combine(new_contact_list[recv_hash])
-				print(f"Reconstructing EphID: {hexlify(sec)}")
-				print("Verifying integrity of EphID...")
-				new_hash = sha256(sec).hexdigest()
-				print()
-				print(f"Received hash: 	   {recv_hash}")
-				print(f"Recontructed hash: {new_hash}")
-				print()
-				if recv_hash == new_hash:
-					print(f"Verified hash. Computing EncID...")
-					enc_id = int(hexlify(sec), 16) * priv_key
-					print(f"EncID is: {enc_id}")
-					
-					if not bloom.check_item(DBF, str(enc_id)): # add enc id
-						bloom.add_item(DBF, str(enc_id))
+				recv_index = int(recv_index)
 
+				# recv_share
+				recv_share = unhexlify(recv_share.encode())
+				
+				if recv_hash not in new_contact_list.keys():
+					new_contact_list[recv_hash] = [(recv_index, recv_share)] # store id share
+					timestamp_dict[recv_hash] = current_time2 # keep track of shares from old id's, for later deletion
 				else:
-					print("Error: Hash not verified.")
-				print()
+					new_contact_list[recv_hash].append((recv_index, recv_share)) # store id share
+				
+				# keep track of number of recv_shares received
+				num_recv_shares = len(new_contact_list[recv_hash])
+				print(f"[Task 3B/3C] Received {num_recv_shares} chunks from {recv_hash}.\n")
+				
+				# Check if the hash contains 3 entries
+				if num_recv_shares == 3:
+					sec = Shamir.combine(new_contact_list[recv_hash])
+					print(f"[Task 4A] Reconstructing EphID: {hexlify(sec)}\n")
+					print("Verifying integrity of EphID...")
+					new_hash = sha256(sec).hexdigest()
+					print(f"Received hash: 	   {recv_hash}")
+					print(f"Recontructed hash: {new_hash}")
+					
+					if recv_hash == new_hash: # id verified
+						print(f"[Task 4B] Verified hash. Computing EncID...")
+						enc_id = dh.gen_shared_key(int(key))
+						print(f"[Task 5A/5B] EncID is: {enc_id} \n")
+						broadcaster = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
+						broadcaster.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
+						send_str = '***' + "|" + recv_hash + "|" + str(public_key)
+						broadcaster.sendto(send_str.encode('utf-8'), ('255.255.255.255', port))
+						
+						if not bloom.check_item(DBF, str(enc_id)): # add enc id to dbf
+							bloom.add_item(DBF, str(enc_id))
+						print("[Task 6/7A] EncID deleted, DBF updated: ", end = "")
+						bloom.print_bloom(DBF)
+						enc_id = 0 # overwrite variable
 
-		# update timer
-		current_time2 = time.time() - start_time2
+					else:
+						print("Error: Hash not verified.")
+
+			# update timer
+			current_time2 = time.time() - start_time2
 
 
 if __name__ == "__main__":
