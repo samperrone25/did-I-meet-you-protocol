@@ -2,11 +2,9 @@ import socket
 import bloom
 from constants import *
 
-# inspiration: https://pymotw.com/3/socket/tcp.html
-
-# variables
+# global variables
 cbf_array = []
-ip_port = (BACKEND_IP, BACKEND_PORT) # use port 55000, ip found with linux: 'ifconfig'
+ip_port = (BACKEND_IP, BACKEND_PORT) # use port 55000, ip found with linux: 'ifconfig', may not be correct initially
 
 def backend_server():
     # use TCP
@@ -37,12 +35,15 @@ def backend_server():
                 send_str = "Please make a query or upload"
                 if request == "QUERY":
                     # perform bloom matching against cbf_array
-                    print("Comparing query bloom filter against stored contact bloom filters...")
+                    print("[Task 10C] Comparing query bloom filter against stored contact bloom filters...")
                     match = False
-                    for filter in cbf_array:
-                        intersection = bloom.bloom_intersection(realbloom, filter)
-                        
-                    if sum(intersection) >= 3: # 3 hash functions -> 3 similar bits
+                    all_cbfs = [0] * bloom.BLOOM_FILTER_SIZE 
+                    if cbf_array:
+                        for filter in cbf_array:
+                            all_cbfs = bloom.merge_blooms(all_cbfs, filter)
+
+                        intersection = bloom.bloom_intersection(realbloom, all_cbfs)
+                        if sum(intersection) >= 3: # 3 hash functions -> 3 similar bits
                             match = True
 
                     # return result
@@ -58,7 +59,7 @@ def backend_server():
                     print("CBF added to cbf_array")
                     send_str = "Upload Successful"
                 
-                client.sendall(send_str.encode('utf-8'))
+                client.sendall(send_str.encode('utf-8')) # reply to client
                 print("Result: " + send_str + "\n")
 
             else:
