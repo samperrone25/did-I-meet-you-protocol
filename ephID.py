@@ -6,7 +6,7 @@ from binascii import hexlify
 
 # Code sample from document
 # which generates a 16 ephID
-# using the curve as the paper discribed
+# using the curve as the paper described
 def gen_ephID():
 	curve = SECP128r1
 	secexp = randrange(curve.order)
@@ -15,12 +15,12 @@ def gen_ephID():
 
 	return secexp, ephid
 
-# print both id and recive shares
+# print id and shares
 def print_id(id, chunks):
 	print()
-	print(f"Generating ID: {hexlify(id)}")
+	print(f"[Task 1] Generating ID: {hexlify(id)}")
 	for i, chunk in chunks:
-		print(f"Chunk {i}: ({i}, {hexlify(chunk)})")
+		print(f"[Task 2] Chunk {i}: ({i}, {hexlify(chunk)})")
 	print()
 
 if __name__ == "__main__":
