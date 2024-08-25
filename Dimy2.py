@@ -107,7 +107,7 @@ def udp_client():
 	QBFtimer = QBF_TIMER # new qbf every QBF_TIMER seconds
 	start_time2 = time.time()
 	current_time2 = time.time() - start_time2
-	covid_time = int(sys.argv[1]) # time until diagnosis
+	covid_time = int(sys.argv[1]) # time until diagnosis (seconds)
 
 	while True:
 		

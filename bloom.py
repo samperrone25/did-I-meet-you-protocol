@@ -2,10 +2,10 @@
 # 100 KB = 819200 bits
 
 # bloom_filter = [0] * size
-import pyhash
+import xxhash
 
 BLOOM_FILTER_SIZE = 100 # change to 819200 for real implementation, 100 KILOBYTES = 819200 BITS
-HFUNCS = [pyhash.murmur3_32(), pyhash.lookup3(), pyhash.xx_64()]
+HFUNCS = [xxhash.xxh32_intdigest, xxhash.xxh3_128_intdigest, xxhash.xxh3_64_intdigest]
 
 def add_item(bloom, item):
 

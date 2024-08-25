@@ -1,4 +1,4 @@
-BACKEND_IP = '192.168.88.135' # found with linux: 'ifconfig', may not be correct initially
+BACKEND_IP = 'localhost' # found with linux: 'ifconfig', may not be correct initially
 BACKEND_PORT = 55000 # 55000
 NODE_PORT = 38000
 
