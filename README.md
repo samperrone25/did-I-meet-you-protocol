@@ -10,5 +10,5 @@ An application-layer protocol designed to track the spread of a disease. A simpl
 7) Every 9 minutes all DBFs are combined into another Bloom Filter called the Query Bloom Filter (QBF) and deleted. The QBF is sent to the backend server (TCP) and compared with the servers Contact Bloom Filter (CBF) which contains the encounters of all covid positive clients. The result is shown to the client.  
 9) When a client gets covid they can upload their QBFs for merging with the CBF.  
 ## To Run  
-python3 Dimy2.py [seconds_until_covid_diagnosis] ## for client
-python3 DimyServer.py ## for server
+`python3 Dimy2.py [seconds_until_covid_diagnosis] ## for client`  
+`python3 DimyServer.py ## for server`
